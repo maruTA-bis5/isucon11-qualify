@@ -185,6 +185,17 @@ func getEnv(key string, defaultValue string) string {
 	return defaultValue
 }
 
+func getEnvInt(key string, defaultValue int) int {
+	val := getEnv(key, "")
+	if val != "" {
+		intVal, err := strconv.Atoi(val)
+		if err != nil {
+			return intVal
+		}
+	}
+	return defaultValue
+}
+
 func NewMySQLConnectionEnv() *MySQLConnectionEnv {
 	return &MySQLConnectionEnv{
 		Host:     getEnv("MYSQL_HOST", "127.0.0.1"),
@@ -269,7 +280,7 @@ func main() {
 		e.Logger.Fatalf("failed to connect db: %v", err)
 		return
 	}
-	db.SetMaxOpenConns(30)
+	db.SetMaxOpenConns(getEnvInt("DB_MAX_CONN", 10))
 	defer db.Close()
 
 	postIsuConditionTargetBaseURL = os.Getenv("POST_ISUCONDITION_TARGET_BASE_URL")
