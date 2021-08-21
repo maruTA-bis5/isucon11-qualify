@@ -570,6 +570,11 @@ func registerIsu(c echo.Context, jiaIsuUUID, isuName, jiaUserID string) error {
 	return tx.Commit()
 }
 
+func rollbackIsu(c echo.Context, tx *sqlx.Tx, jiaIsuUUID string) {
+	tx.Rollback()
+	db.ExecContext(c.Request().Context(), "DELETE FROM `isu` WHERE `jia_isu_uuid` = ?", jiaIsuUUID)
+}
+
 // POST /api/isu
 // ISUを登録
 func postIsu(c echo.Context) error {
@@ -628,7 +633,7 @@ func postIsu(c echo.Context) error {
 		c.Logger().Errorf("db error: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
-	defer tx.Rollback()
+	defer rollbackIsu(c, tx, jiaIsuUUID)
 
 	_, err = tx.ExecContext(c.Request().Context(), "UPDATE `isu` SET `image` = ? WHERE `jia_isu_uuid` = ?",
 		image, jiaIsuUUID)
