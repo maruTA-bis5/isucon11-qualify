@@ -24,6 +24,8 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/log"
+	nrecho "github.com/newrelic/go-agent/v3/integrations/nrecho-v4"
+	newrelic "github.com/newrelic/go-agent/v3/newrelic"
 )
 
 const (
@@ -46,8 +48,8 @@ var (
 	db                  *sqlx.DB
 	sessionStore        sessions.Store
 	mySQLConnectionData *MySQLConnectionEnv
-
-	jiaJWTSigningKey *ecdsa.PublicKey
+	nrApp               *newrelic.Application
+	jiaJWTSigningKey    *ecdsa.PublicKey
 
 	postIsuConditionTargetBaseURL string // JIAへのactivate時に登録する，ISUがconditionを送る先のURL
 )
@@ -210,6 +212,24 @@ func main() {
 	e := echo.New()
 	e.Debug = true
 	e.Logger.SetLevel(log.DEBUG)
+
+	nrLicense := getEnv("NEWRELIC_LICENSE_KEY", "")
+	if nrLicense != "" {
+		var err error
+		nrApp, err = newrelic.NewApplication(
+			newrelic.ConfigAppName("isucondition"),
+			newrelic.ConfigLicense(nrLicense),
+			newrelic.ConfigDebugLogger(os.Stdout),
+			func(cfg *newrelic.Config) {
+				cfg.CustomInsightsEvents.Enabled = false
+			},
+		)
+		if err != nil {
+			panic(err)
+		} else {
+			e.Use(nrecho.Middleware(nrApp))
+		}
+	}
 
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
