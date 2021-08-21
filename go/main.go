@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -54,6 +55,8 @@ var (
 	jiaJWTSigningKey    *ecdsa.PublicKey
 
 	postIsuConditionTargetBaseURL string // JIAへのactivate時に登録する，ISUがconditionを送る先のURL
+	jiaServiceURL                 string
+	jiaServiceURLMutex            sync.RWMutex
 )
 
 type Config struct {
@@ -314,6 +317,13 @@ func getUserIDFromSession(c echo.Context) (string, int, error) {
 }
 
 func getJIAServiceURL(ctx context.Context, tx *sqlx.Tx) string {
+	jiaServiceURLMutex.RLock()
+	defer jiaServiceURLMutex.RUnlock()
+	if jiaServiceURL != "" {
+		return jiaServiceURL
+	}
+	jiaServiceURLMutex.Lock()
+	defer jiaServiceURLMutex.Unlock()
 	var config Config
 	err := tx.GetContext(ctx, &config, "SELECT * FROM `isu_association_config` WHERE `name` = ?", "jia_service_url")
 	if err != nil {
@@ -349,6 +359,9 @@ func postInitialize(c echo.Context) error {
 		"jia_service_url",
 		request.JIAServiceURL,
 	)
+
+	jiaServiceURL = request.JIAServiceURL
+
 	if err != nil {
 		c.Logger().Errorf("db error : %v", err)
 		return c.NoContent(http.StatusInternalServerError)
