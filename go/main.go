@@ -763,7 +763,7 @@ func getIsuIcon(c echo.Context) error {
 		}
 
 		c.Logger().Error(err)
-		return c.String(http.StatusInternalServerError, "サインインしているけどエラー")
+		return c.NoContent(http.StatusInternalServerError)
 	}
 
 	jiaIsuUUID := c.Param("jia_isu_uuid")
@@ -777,9 +777,11 @@ func getIsuIcon(c echo.Context) error {
 	}
 	if imageFile != "" {
 		image, err = rdb.WithContext(c.Request().Context()).Get(c.Request().Context(), imageFile).Bytes()
-		if len(image) > 0 {
-			return c.Blob(http.StatusOK, "", image)
+		if err != nil {
+			c.Logger().Errorf("redis get error: %v", err)
+			return c.String(http.StatusInternalServerError, "redis get error")
 		}
+		return c.Blob(http.StatusOK, "", image)
 	}
 	err = db.GetContext(c.Request().Context(), &image, "SELECT `image` FROM `isu` WHERE `jia_user_id` = ? AND `jia_isu_uuid` = ?",
 		jiaUserID, jiaIsuUUID)
@@ -789,7 +791,7 @@ func getIsuIcon(c echo.Context) error {
 		}
 
 		c.Logger().Errorf("db error: %v", err)
-		return c.String(http.StatusInternalServerError, "db error")
+		return c.NoContent(http.StatusInternalServerError)
 	}
 
 	return c.Blob(http.StatusOK, "", image)
