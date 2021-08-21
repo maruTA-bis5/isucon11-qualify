@@ -558,24 +558,16 @@ func getIsuList(c echo.Context) error {
 	return c.JSON(http.StatusOK, responseList)
 }
 
-func registerIsu(c echo.Context, jiaIsuUUID, isuName, jiaUserID string) (bool, error) {
+func registerIsu(c echo.Context, jiaIsuUUID, isuName, jiaUserID string) error {
 	tx, err := db.Beginx()
 	if err != nil {
-		return false, err
+		return err
 	}
 	defer tx.Rollback()
 	_, err = tx.ExecContext(c.Request().Context(), "INSERT INTO `isu`"+
 		"	(`jia_isu_uuid`, `name`, `jia_user_id`) VALUES (?, ?, ?)",
 		jiaIsuUUID, isuName, jiaUserID)
-	if err != nil {
-		mysqlErr, ok := err.(*mysql.MySQLError)
-
-		if ok && mysqlErr.Number == uint16(mysqlErrNumDuplicateEntry) {
-			return true, err
-		}
-	}
-
-	return false, tx.Commit()
+	return tx.Commit()
 }
 
 func rollbackIsu(c echo.Context, tx *sqlx.Tx, jiaIsuUUID string) {
@@ -610,10 +602,7 @@ func postIsu(c echo.Context) error {
 		useDefaultImage = true
 	}
 
-	duplicated, err := registerIsu(c, jiaIsuUUID, isuName, jiaUserID)
-	if duplicated {
-		return c.String(http.StatusConflict, "duplicated: isu")
-	}
+	err = registerIsu(c, jiaIsuUUID, isuName, jiaUserID)
 	if err != nil {
 		c.Logger().Errorf("failed to request to JIAService: %v", err)
 		return c.String(http.StatusInternalServerError, "register isu failure")
@@ -651,6 +640,12 @@ func postIsu(c echo.Context) error {
 	_, err = tx.ExecContext(c.Request().Context(), "UPDATE `isu` SET `image` = ? WHERE `jia_isu_uuid` = ?",
 		image, jiaIsuUUID)
 	if err != nil {
+		mysqlErr, ok := err.(*mysql.MySQLError)
+
+		if ok && mysqlErr.Number == uint16(mysqlErrNumDuplicateEntry) {
+			return c.String(http.StatusConflict, "duplicated: isu")
+		}
+
 		c.Logger().Errorf("db error: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
