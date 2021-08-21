@@ -375,6 +375,12 @@ func postInitialize(c echo.Context) error {
 		request.JIAServiceURL,
 	)
 
+	// error なら すでに列がある
+	_, _ = db.ExecContext(
+		c.Request().Context(),
+		"ALTER TABLE `isu` ADD COLUMN `image_file` VARCHAR(255)",
+	)
+
 	jiaServiceURL = request.JIAServiceURL
 
 	if err != nil {
