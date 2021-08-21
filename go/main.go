@@ -26,6 +26,7 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/log"
 	nrecho "github.com/newrelic/go-agent/v3/integrations/nrecho-v4"
+	_ "github.com/newrelic/go-agent/v3/integrations/nrmysql"
 	newrelic "github.com/newrelic/go-agent/v3/newrelic"
 )
 
