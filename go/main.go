@@ -558,18 +558,6 @@ func getIsuList(c echo.Context) error {
 	return c.JSON(http.StatusOK, responseList)
 }
 
-func registerIsu(c echo.Context, jiaIsuUUID, isuName, jiaUserID string) error {
-	tx, err := db.Beginx()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	_, err = tx.ExecContext(c.Request().Context(), "INSERT INTO `isu`"+
-		"	(`jia_isu_uuid`, `name`, `jia_user_id`) VALUES (?, ?, ?)",
-		jiaIsuUUID, isuName, jiaUserID)
-	return tx.Commit()
-}
-
 // POST /api/isu
 // ISUを登録
 func postIsu(c echo.Context) error {
@@ -595,11 +583,6 @@ func postIsu(c echo.Context) error {
 		useDefaultImage = true
 	}
 
-	err = registerIsu(c, jiaIsuUUID, isuName, jiaUserID)
-	if err != nil {
-		c.Logger().Errorf("failed to request to JIAService: %v", err)
-		return c.String(http.StatusInternalServerError, "register isu failure")
-	}
 	var image []byte
 
 	if useDefaultImage {
@@ -630,8 +613,9 @@ func postIsu(c echo.Context) error {
 	}
 	defer tx.Rollback()
 
-	_, err = tx.ExecContext(c.Request().Context(), "UPDATE `isu` SET `image` = ? WHERE `jia_isu_uuid` = ?",
-		image, jiaIsuUUID)
+	_, err = tx.ExecContext(c.Request().Context(), "INSERT INTO `isu`"+
+		"	(`jia_isu_uuid`, `name`, `image`, `jia_user_id`) VALUES (?, ?, ?, ?)",
+		jiaIsuUUID, isuName, image, jiaUserID)
 	if err != nil {
 		mysqlErr, ok := err.(*mysql.MySQLError)
 
