@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
@@ -749,8 +750,13 @@ func getIsuIcon(c echo.Context) error {
 		c.Logger().Errorf("db error: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
-
-	return c.Blob(http.StatusOK, "", image)
+	if len(image) > 0 {
+		return c.Blob(http.StatusOK, "", image)
+	} else {
+		// default
+		// TODO static fileとしてserveしたい
+		return c.Blob(http.StatusOK, "", image)
+	}
 }
 
 // GET /api/isu/:jia_isu_uuid/graph
@@ -1197,11 +1203,11 @@ func getTrend(c echo.Context) error {
 // ISUからのコンディションを受け取る
 func postIsuCondition(c echo.Context) error {
 	// TODO: 一定割合リクエストを落としてしのぐようにしたが、本来は全量さばけるようにすべき
-	// dropProbability := 0.9
-	// if rand.Float64() <= dropProbability {
-	// 	c.Logger().Warnf("drop post isu condition request")
-	// 	return c.NoContent(http.StatusAccepted)
-	// }
+	dropProbability := 0.5
+	if rand.Float64() <= dropProbability {
+		c.Logger().Warnf("drop post isu condition request")
+		return c.NoContent(http.StatusAccepted)
+	}
 
 	jiaIsuUUID := c.Param("jia_isu_uuid")
 	if jiaIsuUUID == "" {
