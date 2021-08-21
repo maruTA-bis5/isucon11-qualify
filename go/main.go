@@ -634,11 +634,9 @@ func postIsu(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	if !useDefaultImage {
-		go func() {
-			ioutil.WriteFile(frontendContentsPath+"/uploads/"+jiaIsuUUID, image, os.ModeAppend)
-		}()
-	}
+	go func() {
+		db.ExecContext(context.Background(), "UPDATE `isu` SET `image` = ? WHERE `jia_isu_uuid` = ?", image, jiaIsuUUID)
+	}()
 
 	targetURL := getJIAServiceURL(c.Request().Context(), tx) + "/api/activate" // TODO 変えられない？
 	body := JIAServiceRequest{postIsuConditionTargetBaseURL, jiaIsuUUID}
@@ -752,20 +750,23 @@ func getIsuIcon(c echo.Context) error {
 	jiaIsuUUID := c.Param("jia_isu_uuid")
 
 	var image []byte
-	image, err = ioutil.ReadFile(frontendContentsPath + "/uploads/" + jiaIsuUUID)
+	err = db.GetContext(c.Request().Context(), &image, "SELECT `image` FROM `isu` WHERE `jia_user_id` = ? AND `jia_isu_uuid` = ?",
+		jiaUserID, jiaIsuUUID)
 	if err != nil {
-		err = db.GetContext(c.Request().Context(), &image, "SELECT `image` FROM `isu` WHERE `jia_user_id` = ? AND `jia_isu_uuid` = ?",
-			jiaUserID, jiaIsuUUID)
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return c.String(http.StatusNotFound, "not found: isu")
-			}
-
-			c.Logger().Errorf("db error: %v", err)
-			return c.NoContent(http.StatusInternalServerError)
+		if errors.Is(err, sql.ErrNoRows) {
+			return c.String(http.StatusNotFound, "not found: isu")
 		}
+
+		c.Logger().Errorf("db error: %v", err)
+		return c.NoContent(http.StatusInternalServerError)
 	}
-	return c.Blob(http.StatusOK, "", image)
+	if len(image) > 0 {
+		return c.Blob(http.StatusOK, "", image)
+	} else {
+		// default
+		// TODO static fileとしてserveしたい
+		return c.Blob(http.StatusOK, "", image)
+	}
 }
 
 // GET /api/isu/:jia_isu_uuid/graph
