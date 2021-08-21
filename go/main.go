@@ -760,13 +760,8 @@ func getIsuIcon(c echo.Context) error {
 		c.Logger().Errorf("db error: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
-	if len(image) > 0 {
-		return c.Blob(http.StatusOK, "", image)
-	} else {
-		// default
-		// TODO static fileとしてserveしたい
-		return c.Blob(http.StatusOK, "", image)
-	}
+
+	return c.Blob(http.StatusOK, "", image)
 }
 
 // GET /api/isu/:jia_isu_uuid/graph
