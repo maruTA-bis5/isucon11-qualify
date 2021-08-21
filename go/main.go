@@ -827,6 +827,9 @@ func getIsuGraph(c echo.Context) error {
 
 // グラフのデータ点を一日分生成
 func generateIsuGraphResponse(ctx context.Context, tx *sqlx.Tx, jiaIsuUUID string, graphDate time.Time) ([]GraphResponse, error) {
+	if nrApp != nil {
+		defer newrelic.FromContext(ctx).StartSegment("generateIsuGraphResponse").End()
+	}
 	dataPoints := []GraphDataPointWithInfo{}
 	conditionsInThisHour := []IsuCondition{}
 	timestampsInThisHour := []int64{}
