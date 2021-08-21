@@ -1153,7 +1153,7 @@ func bulkLoadConditions(c echo.Context, chairUUIDs []string) (map[string]IsuCond
 	if len(chairUUIDs) == 0 {
 		return make(map[string]IsuCondition), nil
 	}
-	query, params, err := sqlx.In("SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` IN (?) ORDER BY `jia_isu_uuid`, `timestamp` DESC", chairUUIDs)
+	query, params, err := sqlx.In("SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` IN (?) ORDER BY jia_isu_uuid, timestamp DESC")
 	if err != nil {
 		return nil, err
 	}
