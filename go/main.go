@@ -20,7 +20,6 @@ import (
 	"github.com/goccy/go-json"
 
 	"github.com/dgrijalva/jwt-go"
-	redis "github.com/go-redis/redis/v8"
 	"github.com/go-sql-driver/mysql"
 	"github.com/gorilla/sessions"
 	"github.com/jmoiron/sqlx"
@@ -46,14 +45,10 @@ const (
 	scoreConditionLevelInfo     = 3
 	scoreConditionLevelWarning  = 2
 	scoreConditionLevelCritical = 1
-	DEFAULT_IMAGE_KEY           = "no-image"
-	IMAGE_PREFIX                = "image-"
 )
 
 var (
-	db  *sqlx.DB
-	rdb *redis.Client
-
+	db                  *sqlx.DB
 	sessionStore        sessions.Store
 	mySQLConnectionData *MySQLConnectionEnv
 	nrApp               *newrelic.Application
@@ -74,7 +69,6 @@ type Isu struct {
 	JIAIsuUUID string    `db:"jia_isu_uuid" json:"jia_isu_uuid"`
 	Name       string    `db:"name" json:"name"`
 	Image      []byte    `db:"image" json:"-"`
-	ImageFile  string    `db:"image_file" json:"-"`
 	Character  string    `db:"character" json:"character"`
 	JIAUserID  string    `db:"jia_user_id" json:"-"`
 	CreatedAt  time.Time `db:"created_at" json:"-"`
@@ -278,8 +272,6 @@ func main() {
 	db.SetMaxOpenConns(20)
 	defer db.Close()
 
-	rdb = getRedisClient()
-
 	postIsuConditionTargetBaseURL = os.Getenv("POST_ISUCONDITION_TARGET_BASE_URL")
 	if postIsuConditionTargetBaseURL == "" {
 		e.Logger.Fatalf("missing: POST_ISUCONDITION_TARGET_BASE_URL")
@@ -288,14 +280,6 @@ func main() {
 
 	serverPort := fmt.Sprintf(":%v", getEnv("SERVER_APP_PORT", "3000"))
 	e.Logger.Fatal(e.Start(serverPort))
-
-	// preload
-	var image []byte
-	image, err = ioutil.ReadFile(defaultIconFilePath)
-	if err != nil {
-		e.Logger.Error(err)
-	}
-	rdb.Set(context.Background(), DEFAULT_IMAGE_KEY, image, 0)
 }
 
 func getSession(r *http.Request) (*sessions.Session, error) {
@@ -629,12 +613,9 @@ func postIsu(c echo.Context) error {
 	}
 	defer tx.Rollback()
 
-	imageKey := IMAGE_PREFIX + fh.Filename
-	rdb.WithContext(c.Request().Context()).Set(c.Request().Context(), imageKey, image, 0)
-
 	_, err = tx.ExecContext(c.Request().Context(), "INSERT INTO `isu`"+
-		"	(`jia_isu_uuid`, `name`, `image_file`, `jia_user_id`) VALUES (?, ?, ?, ?)",
-		jiaIsuUUID, isuName, imageKey, jiaUserID)
+		"	(`jia_isu_uuid`, `name`, `image`, `jia_user_id`) VALUES (?, ?, ?, ?)",
+		jiaIsuUUID, isuName, image, jiaUserID)
 	if err != nil {
 		mysqlErr, ok := err.(*mysql.MySQLError)
 
@@ -712,11 +693,6 @@ func postIsu(c echo.Context) error {
 	return c.JSON(http.StatusCreated, isu)
 }
 
-func getRedisClient() *redis.Client {
-	opts := &redis.Options{Addr: getEnv("REDIS_ADDR", "localhost:6379")}
-	return redis.NewClient(opts)
-}
-
 // GET /api/isu/:jia_isu_uuid
 // ISUの情報を取得
 func getIsuID(c echo.Context) error {
@@ -762,21 +738,7 @@ func getIsuIcon(c echo.Context) error {
 
 	jiaIsuUUID := c.Param("jia_isu_uuid")
 
-	var imageFile string
 	var image []byte
-	err = db.GetContext(c.Request().Context(), &imageFile, "SELECT `image_file` FROM `isu` WHERE `jia_user_id` = ? AND `jia_isu_uuid` = ?",
-		jiaUserID, jiaIsuUUID)
-	if err != nil && errors.Is(err, sql.ErrNoRows) {
-		return c.String(http.StatusNotFound, "not found: isu")
-	}
-	if imageFile != "" {
-		image, err = rdb.WithContext(c.Request().Context()).Get(c.Request().Context(), imageFile).Bytes()
-		if err != nil {
-			c.Logger().Errorf("redis get error: %v", err)
-			return c.String(http.StatusInternalServerError, "redis get error")
-		}
-		return c.Blob(http.StatusOK, "", image)
-	}
 	err = db.GetContext(c.Request().Context(), &image, "SELECT `image` FROM `isu` WHERE `jia_user_id` = ? AND `jia_isu_uuid` = ?",
 		jiaUserID, jiaIsuUUID)
 	if err != nil {
