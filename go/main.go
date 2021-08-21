@@ -1295,7 +1295,7 @@ func postIsuCondition(c echo.Context) error {
 			return c.String(http.StatusBadRequest, "bad request body")
 		}
 
-		placeholders = append(placeholders, "(?,?,?,?,?~")
+		placeholders = append(placeholders, "(?,?,?,?,?)")
 		params = append(params, jiaIsuUUID, timestamp, cond.IsSitting, cond.Condition, cond.Message)
 	}
 	_, err = tx.ExecContext(
