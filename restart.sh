@@ -1,6 +1,6 @@
 #!/bin/bash
 
 sudo systemctl stop nginx
-sudo rm /var/log/nginx/access.lgo
+sudo rm -f /var/log/nginx/access.log
 sudo systemctl start nginx
 
