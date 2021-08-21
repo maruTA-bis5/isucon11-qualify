@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -17,6 +16,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/goccy/go-json"
 
 	"github.com/dgrijalva/jwt-go"
 	redis "github.com/go-redis/redis/v8"
