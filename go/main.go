@@ -607,7 +607,6 @@ func postIsu(c echo.Context) error {
 
 	var image []byte
 
-	imageKey := DEFAULT_IMAGE_KEY
 	if useDefaultImage {
 		image, err = ioutil.ReadFile(defaultIconFilePath)
 		if err != nil {
@@ -627,8 +626,6 @@ func postIsu(c echo.Context) error {
 			c.Logger().Error(err)
 			return c.NoContent(http.StatusInternalServerError)
 		}
-		imageKey = IMAGE_PREFIX + fh.Filename
-		rdb.WithContext(c.Request().Context()).Set(c.Request().Context(), imageKey, image, 0)
 	}
 
 	tx, err := db.Beginx()
@@ -637,6 +634,9 @@ func postIsu(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 	defer tx.Rollback()
+
+	imageKey := IMAGE_PREFIX + fh.Filename
+	rdb.WithContext(c.Request().Context()).Set(c.Request().Context(), imageKey, image, 0)
 
 	_, err = tx.ExecContext(c.Request().Context(), "INSERT INTO `isu`"+
 		"	(`jia_isu_uuid`, `name`, `image_file`, `jia_user_id`) VALUES (?, ?, ?, ?)",
