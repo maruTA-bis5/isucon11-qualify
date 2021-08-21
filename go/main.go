@@ -586,6 +586,10 @@ func postIsu(c echo.Context) error {
 
 	var image []byte
 
+	var segment *newrelic.Segment
+	if nrApp != nil {
+		segment = newrelic.FromContext(c.Request().Context()).StartSegment("read icon")
+	}
 	if useDefaultImage {
 		image, err = ioutil.ReadFile(defaultIconFilePath)
 		if err != nil {
@@ -605,6 +609,9 @@ func postIsu(c echo.Context) error {
 			c.Logger().Error(err)
 			return c.NoContent(http.StatusInternalServerError)
 		}
+	}
+	if nrApp != nil {
+		segment.End()
 	}
 
 	tx, err := db.Beginx()
@@ -640,7 +647,7 @@ func postIsu(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	reqJIA, err := http.NewRequest(http.MethodPost, targetURL, bytes.NewBuffer(bodyJSON))
+	reqJIA, err := http.NewRequestWithContext(c.Request().Context(), http.MethodPost, targetURL, bytes.NewBuffer(bodyJSON))
 	if err != nil {
 		c.Logger().Error(err)
 		return c.NoContent(http.StatusInternalServerError)
