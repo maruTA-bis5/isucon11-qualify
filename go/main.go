@@ -615,8 +615,8 @@ func postIsu(c echo.Context) error {
 	defer tx.Rollback()
 
 	_, err = tx.ExecContext(c.Request().Context(), "INSERT INTO `isu`"+
-		"	(`jia_isu_uuid`, `name`, `image`, `jia_user_id`) VALUES (?, ?, ?, ?)",
-		jiaIsuUUID, isuName, image, jiaUserID)
+		"	(`jia_isu_uuid`, `name`, `jia_user_id`) VALUES (?, ?, ?)",
+		jiaIsuUUID, isuName, jiaUserID)
 	if err != nil {
 		mysqlErr, ok := err.(*mysql.MySQLError)
 
@@ -627,6 +627,10 @@ func postIsu(c echo.Context) error {
 		c.Logger().Errorf("db error: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
+
+	go func() {
+		db.ExecContext(context.Background(), "UPDATE `isu` SET `image` = ? WHERE `jia_isu_uuid` = ?", image, jiaIsuUUID)
+	}()
 
 	targetURL := getJIAServiceURL(c.Request().Context(), tx) + "/api/activate" // TODO 変えられない？
 	body := JIAServiceRequest{postIsuConditionTargetBaseURL, jiaIsuUUID}
