@@ -25,7 +25,6 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/log"
-	dbprof "github.com/maruTA-bis5/nr-db-stats-profiler"
 	nrecho "github.com/newrelic/go-agent/v3/integrations/nrecho-v4"
 	_ "github.com/newrelic/go-agent/v3/integrations/nrmysql"
 	newrelic "github.com/newrelic/go-agent/v3/newrelic"
@@ -185,17 +184,6 @@ func getEnv(key string, defaultValue string) string {
 	return defaultValue
 }
 
-func getEnvInt(key string, defaultValue int) int {
-	val := getEnv(key, "")
-	if val != "" {
-		intVal, err := strconv.Atoi(val)
-		if err != nil {
-			return intVal
-		}
-	}
-	return defaultValue
-}
-
 func NewMySQLConnectionEnv() *MySQLConnectionEnv {
 	return &MySQLConnectionEnv{
 		Host:     getEnv("MYSQL_HOST", "127.0.0.1"),
@@ -280,10 +268,7 @@ func main() {
 		e.Logger.Fatalf("failed to connect db: %v", err)
 		return
 	}
-	if nrApp != nil {
-		dbprof.EnableDBStatsEventRecord(db, nrApp, 10*time.Second)
-	}
-	db.SetMaxOpenConns(getEnvInt("DB_MAX_CONN", 10))
+	db.SetMaxOpenConns(10)
 	defer db.Close()
 
 	postIsuConditionTargetBaseURL = os.Getenv("POST_ISUCONDITION_TARGET_BASE_URL")
