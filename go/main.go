@@ -506,19 +506,20 @@ func getIsuList(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	isuIDs := []string{}
-	for _, isu := range isuList {
-		isuIDs = append(isuIDs, isu.JIAIsuUUID)
-	}
-	condByID, err := bulkLoadConditions(c, isuIDs)
-	if err != nil {
-		c.Logger().Errorf("db error: %v", err)
-		return c.NoContent(http.StatusInternalServerError)
-	}
-
 	responseList := []GetIsuListResponse{}
 	for _, isu := range isuList {
-		lastCondition, foundLastCondition := condByID[isu.JIAIsuUUID]
+		var lastCondition IsuCondition
+		foundLastCondition := true
+		err = tx.GetContext(c.Request().Context(), &lastCondition, "SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ? ORDER BY `timestamp` DESC LIMIT 1",
+			isu.JIAIsuUUID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				foundLastCondition = false
+			} else {
+				c.Logger().Errorf("db error: %v", err)
+				return c.NoContent(http.StatusInternalServerError)
+			}
+		}
 
 		var formattedCondition *GetIsuConditionResponse
 		if foundLastCondition {
