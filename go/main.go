@@ -1149,33 +1149,6 @@ func bulkLoadIsu(c echo.Context) (map[string][]Isu, error) {
 	return chairsByCharacter, nil
 }
 
-func bulkLoadConditions(c echo.Context, chairUUIDs []string) (map[string]IsuCondition, error) {
-	if len(chairUUIDs) == 0 {
-		return make(map[string]IsuCondition), nil
-	}
-	query, params, err := sqlx.In("SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` IN (?) ORDER BY jia_isu_uuid, timestamp DESC")
-	if err != nil {
-		return nil, err
-	}
-	conditions := []IsuCondition{}
-	err = db.SelectContext(c.Request().Context(), &conditions, query, params...)
-	if err != nil {
-		return nil, err
-	}
-	condByIsu := make(map[string]IsuCondition)
-	var currentIsu string
-	for _, cond := range conditions {
-		if currentIsu == "" {
-			currentIsu = cond.JIAIsuUUID
-		}
-		if currentIsu == cond.JIAIsuUUID {
-			continue
-		}
-		condByIsu[currentIsu] = cond
-	}
-	return condByIsu, nil
-}
-
 // GET /api/trend
 // ISUの性格毎の最新のコンディション情報
 func getTrend(c echo.Context) error {
@@ -1193,34 +1166,36 @@ func getTrend(c echo.Context) error {
 		characterInfoIsuConditions := []*TrendCondition{}
 		characterWarningIsuConditions := []*TrendCondition{}
 		characterCriticalIsuConditions := []*TrendCondition{}
-
-		isuIDs := []string{}
 		for _, isu := range isuList {
-			isuIDs = append(isuIDs, isu.JIAIsuUUID)
-		}
-		condByIsu, err := bulkLoadConditions(c, isuIDs)
-		if err != nil {
-			c.Logger().Errorf("db error: %v", err)
-			return c.NoContent(http.StatusInternalServerError)
-		}
-		for _, isu := range isuList {
-			isuLastCondition := condByIsu[isu.JIAIsuUUID]
-			conditionLevel, err := calculateConditionLevel(isuLastCondition.Condition)
+			conditions := []IsuCondition{}
+			err = db.SelectContext(c.Request().Context(), &conditions,
+				"SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ? ORDER BY timestamp DESC LIMIT 1",
+				isu.JIAIsuUUID,
+			)
 			if err != nil {
-				c.Logger().Error(err)
+				c.Logger().Errorf("db error: %v", err)
 				return c.NoContent(http.StatusInternalServerError)
 			}
-			trendCondition := TrendCondition{
-				ID:        isu.ID,
-				Timestamp: isuLastCondition.Timestamp.Unix(),
-			}
-			switch conditionLevel {
-			case "info":
-				characterInfoIsuConditions = append(characterInfoIsuConditions, &trendCondition)
-			case "warning":
-				characterWarningIsuConditions = append(characterWarningIsuConditions, &trendCondition)
-			case "critical":
-				characterCriticalIsuConditions = append(characterCriticalIsuConditions, &trendCondition)
+
+			if len(conditions) > 0 {
+				isuLastCondition := conditions[0]
+				conditionLevel, err := calculateConditionLevel(isuLastCondition.Condition)
+				if err != nil {
+					c.Logger().Error(err)
+					return c.NoContent(http.StatusInternalServerError)
+				}
+				trendCondition := TrendCondition{
+					ID:        isu.ID,
+					Timestamp: isuLastCondition.Timestamp.Unix(),
+				}
+				switch conditionLevel {
+				case "info":
+					characterInfoIsuConditions = append(characterInfoIsuConditions, &trendCondition)
+				case "warning":
+					characterWarningIsuConditions = append(characterWarningIsuConditions, &trendCondition)
+				case "critical":
+					characterCriticalIsuConditions = append(characterCriticalIsuConditions, &trendCondition)
+				}
 			}
 
 		}
