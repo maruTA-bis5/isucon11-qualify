@@ -571,8 +571,10 @@ func registerIsu(c echo.Context, jiaIsuUUID, isuName, jiaUserID string) error {
 }
 
 func rollbackIsu(c echo.Context, tx *sqlx.Tx, jiaIsuUUID string) {
-	tx.Rollback()
-	db.ExecContext(c.Request().Context(), "DELETE FROM `isu` WHERE `jia_isu_uuid` = ?", jiaIsuUUID)
+	err := tx.Rollback()
+	if err != nil {
+		db.ExecContext(c.Request().Context(), "DELETE FROM `isu` WHERE `jia_isu_uuid` = ?", jiaIsuUUID)
+	}
 }
 
 // POST /api/isu
